@@ -92,14 +92,14 @@ public:
         initialize(f, f, extra...);
     }
 
-    /// Construct a cpp_function from a lambda function (possibly with internal state)
-    template <typename Func, typename... Extra,
-              typename = detail::enable_if_t<detail::is_lambda<Func>::value>>
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    cpp_function(Func &&f, const Extra&... extra) {
-        initialize(std::forward<Func>(f),
-                   (detail::function_signature_t<Func> *) nullptr, extra...);
-    }
+    // /// Construct a cpp_function from a lambda function (possibly with internal state)
+    // template <typename Func, typename... Extra,
+    //           typename = detail::enable_if_t<detail::is_lambda<Func>::value>>
+    // // NOLINTNEXTLINE(google-explicit-constructor)
+    // cpp_function(Func &&f, const Extra&... extra) {
+    //     initialize(std::forward<Func>(f),
+    //                (detail::function_signature_t<Func> *) nullptr, extra...);
+    // }
 
     /// Construct a cpp_function from a class method (non-const, no ref-qualifier)
     template <typename Return, typename Class, typename... Arg, typename... Extra>
@@ -153,132 +153,132 @@ protected:
         return unique_function_record(new detail::function_record());
     }
 
-    /// Special internal constructor for functors, lambda functions, etc.
-    template <typename Func, typename Return, typename... Args, typename... Extra>
-    void initialize(Func &&f, Return (*)(Args...), const Extra&... extra) {
-        using namespace detail;
-        struct capture { remove_reference_t<Func> f; };
+//     /// Special internal constructor for functors, lambda functions, etc.
+//     template <typename Func, typename Return, typename... Args, typename... Extra>
+//     void initialize(Func &&f, Return (*)(Args...), const Extra&... extra) {
+//         using namespace detail;
+//         struct capture { remove_reference_t<Func> f; };
 
-        /* Store the function including any extra state it might have (e.g. a lambda capture object) */
-        // The unique_ptr makes sure nothing is leaked in case of an exception.
-        auto unique_rec = make_function_record();
-        auto rec = unique_rec.get();
+//         /* Store the function including any extra state it might have (e.g. a lambda capture object) */
+//         // The unique_ptr makes sure nothing is leaked in case of an exception.
+//         auto unique_rec = make_function_record();
+//         auto rec = unique_rec.get();
 
-        /* Store the capture object directly in the function record if there is enough space */
-        if (PYBIND11_SILENCE_MSVC_C4127(sizeof(capture) <= sizeof(rec->data))) {
-            /* Without these pragmas, GCC warns that there might not be
-               enough space to use the placement new operator. However, the
-               'if' statement above ensures that this is the case. */
-#if defined(__GNUG__) && __GNUC__ >= 6 && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wplacement-new"
-#endif
-            new ((capture *) &rec->data) capture { std::forward<Func>(f) };
-#if defined(__GNUG__) && __GNUC__ >= 6 && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#  pragma GCC diagnostic pop
-#endif
-#if defined(__GNUG__) && !PYBIND11_HAS_STD_LAUNDER && !defined(__INTEL_COMPILER)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#endif
-            // UB without std::launder, but without breaking ABI and/or
-            // a significant refactoring it's "impossible" to solve.
-            if (!std::is_trivially_destructible<capture>::value)
-                rec->free_data = [](function_record *r) {
-                    auto data = PYBIND11_STD_LAUNDER((capture *) &r->data);
-                    (void) data;
-                    data->~capture();
-                };
-#if defined(__GNUG__) && !PYBIND11_HAS_STD_LAUNDER && !defined(__INTEL_COMPILER)
-#  pragma GCC diagnostic pop
-#endif
-        } else {
-            rec->data[0] = new capture { std::forward<Func>(f) };
-            rec->free_data = [](function_record *r) { delete ((capture *) r->data[0]); };
-        }
+//         /* Store the capture object directly in the function record if there is enough space */
+//         if (PYBIND11_SILENCE_MSVC_C4127(sizeof(capture) <= sizeof(rec->data))) {
+//             /* Without these pragmas, GCC warns that there might not be
+//                enough space to use the placement new operator. However, the
+//                'if' statement above ensures that this is the case. */
+// #if defined(__GNUG__) && __GNUC__ >= 6 && !defined(__clang__) && !defined(__INTEL_COMPILER)
+// #  pragma GCC diagnostic push
+// #  pragma GCC diagnostic ignored "-Wplacement-new"
+// #endif
+//             new ((capture *) &rec->data) capture { std::forward<Func>(f) };
+// #if defined(__GNUG__) && __GNUC__ >= 6 && !defined(__clang__) && !defined(__INTEL_COMPILER)
+// #  pragma GCC diagnostic pop
+// #endif
+// #if defined(__GNUG__) && !PYBIND11_HAS_STD_LAUNDER && !defined(__INTEL_COMPILER)
+// #  pragma GCC diagnostic push
+// #  pragma GCC diagnostic ignored "-Wstrict-aliasing"
+// #endif
+//             // UB without std::launder, but without breaking ABI and/or
+//             // a significant refactoring it's "impossible" to solve.
+//             if (!std::is_trivially_destructible<capture>::value)
+//                 rec->free_data = [](function_record *r) {
+//                     auto data = PYBIND11_STD_LAUNDER((capture *) &r->data);
+//                     (void) data;
+//                     data->~capture();
+//                 };
+// #if defined(__GNUG__) && !PYBIND11_HAS_STD_LAUNDER && !defined(__INTEL_COMPILER)
+// #  pragma GCC diagnostic pop
+// #endif
+//         } else {
+//             rec->data[0] = new capture { std::forward<Func>(f) };
+//             rec->free_data = [](function_record *r) { delete ((capture *) r->data[0]); };
+//         }
 
-        /* Type casters for the function arguments and return value */
-        using cast_in = argument_loader<Args...>;
-        using cast_out = make_caster<
-            conditional_t<std::is_void<Return>::value, void_type, Return>
-        >;
+//         /* Type casters for the function arguments and return value */
+//         using cast_in = argument_loader<Args...>;
+//         using cast_out = make_caster<
+//             conditional_t<std::is_void<Return>::value, void_type, Return>
+//         >;
 
-        static_assert(expected_num_args<Extra...>(sizeof...(Args), cast_in::args_pos >= 0, cast_in::has_kwargs),
-                      "The number of argument annotations does not match the number of function arguments");
+//         static_assert(expected_num_args<Extra...>(sizeof...(Args), cast_in::args_pos >= 0, cast_in::has_kwargs),
+//                       "The number of argument annotations does not match the number of function arguments");
 
-        /* Dispatch code which converts function arguments and performs the actual function call */
-        rec->impl = [](function_call &call) -> handle {
-            cast_in args_converter;
+//         /* Dispatch code which converts function arguments and performs the actual function call */
+//         rec->impl = [](function_call &call) -> handle {
+//             cast_in args_converter;
 
-            /* Try to cast the function arguments into the C++ domain */
-            if (!args_converter.load_args(call))
-                return PYBIND11_TRY_NEXT_OVERLOAD;
+//             /* Try to cast the function arguments into the C++ domain */
+//             if (!args_converter.load_args(call))
+//                 return PYBIND11_TRY_NEXT_OVERLOAD;
 
-            /* Invoke call policy pre-call hook */
-            process_attributes<Extra...>::precall(call);
+//             /* Invoke call policy pre-call hook */
+//             process_attributes<Extra...>::precall(call);
 
-            /* Get a pointer to the capture object */
-            auto data = (sizeof(capture) <= sizeof(call.func.data)
-                         ? &call.func.data : call.func.data[0]);
-            auto *cap = const_cast<capture *>(reinterpret_cast<const capture *>(data));
+//             /* Get a pointer to the capture object */
+//             auto data = (sizeof(capture) <= sizeof(call.func.data)
+//                          ? &call.func.data : call.func.data[0]);
+//             auto *cap = const_cast<capture *>(reinterpret_cast<const capture *>(data));
 
-            /* Override policy for rvalues -- usually to enforce rvp::move on an rvalue */
-            return_value_policy policy = return_value_policy_override<Return>::policy(call.func.policy);
+//             /* Override policy for rvalues -- usually to enforce rvp::move on an rvalue */
+//             return_value_policy policy = return_value_policy_override<Return>::policy(call.func.policy);
 
-            /* Function scope guard -- defaults to the compile-to-nothing `void_type` */
-            using Guard = extract_guard_t<Extra...>;
+//             /* Function scope guard -- defaults to the compile-to-nothing `void_type` */
+//             using Guard = extract_guard_t<Extra...>;
 
-            /* Perform the function call */
-            handle result = cast_out::cast(
-                std::move(args_converter).template call<Return, Guard>(cap->f), policy, call.parent);
+//             /* Perform the function call */
+//             handle result = cast_out::cast(
+//                 std::move(args_converter).template call<Return, Guard>(cap->f), policy, call.parent);
 
-            /* Invoke call policy post-call hook */
-            process_attributes<Extra...>::postcall(call, result);
+//             /* Invoke call policy post-call hook */
+//             process_attributes<Extra...>::postcall(call, result);
 
-            return result;
-        };
+//             return result;
+//         };
 
-        rec->nargs_pos = cast_in::args_pos >= 0
-            ? static_cast<std::uint16_t>(cast_in::args_pos)
-            : sizeof...(Args) - cast_in::has_kwargs; // Will get reduced more if we have a kw_only
-        rec->has_args = cast_in::args_pos >= 0;
-        rec->has_kwargs = cast_in::has_kwargs;
+//         rec->nargs_pos = cast_in::args_pos >= 0
+//             ? static_cast<std::uint16_t>(cast_in::args_pos)
+//             : sizeof...(Args) - cast_in::has_kwargs; // Will get reduced more if we have a kw_only
+//         rec->has_args = cast_in::args_pos >= 0;
+//         rec->has_kwargs = cast_in::has_kwargs;
 
-        /* Process any user-provided function attributes */
-        process_attributes<Extra...>::init(extra..., rec);
+//         /* Process any user-provided function attributes */
+//         process_attributes<Extra...>::init(extra..., rec);
 
-        {
-            constexpr bool has_kw_only_args = any_of<std::is_same<kw_only, Extra>...>::value,
-                           has_pos_only_args = any_of<std::is_same<pos_only, Extra>...>::value,
-                           has_arg_annotations = any_of<is_keyword<Extra>...>::value;
-            static_assert(has_arg_annotations || !has_kw_only_args, "py::kw_only requires the use of argument annotations");
-            static_assert(has_arg_annotations || !has_pos_only_args, "py::pos_only requires the use of argument annotations (for docstrings and aligning the annotations to the argument)");
+//         {
+//             constexpr bool has_kw_only_args = any_of<std::is_same<kw_only, Extra>...>::value,
+//                            has_pos_only_args = any_of<std::is_same<pos_only, Extra>...>::value,
+//                            has_arg_annotations = any_of<is_keyword<Extra>...>::value;
+//             static_assert(has_arg_annotations || !has_kw_only_args, "py::kw_only requires the use of argument annotations");
+//             static_assert(has_arg_annotations || !has_pos_only_args, "py::pos_only requires the use of argument annotations (for docstrings and aligning the annotations to the argument)");
 
-            static_assert(constexpr_sum(is_kw_only<Extra>::value...) <= 1, "py::kw_only may be specified only once");
-            static_assert(constexpr_sum(is_pos_only<Extra>::value...) <= 1, "py::pos_only may be specified only once");
-            constexpr auto kw_only_pos = constexpr_first<is_kw_only, Extra...>();
-            constexpr auto pos_only_pos = constexpr_first<is_pos_only, Extra...>();
-            static_assert(!(has_kw_only_args && has_pos_only_args) || pos_only_pos < kw_only_pos, "py::pos_only must come before py::kw_only");
-        }
+//             static_assert(constexpr_sum(is_kw_only<Extra>::value...) <= 1, "py::kw_only may be specified only once");
+//             static_assert(constexpr_sum(is_pos_only<Extra>::value...) <= 1, "py::pos_only may be specified only once");
+//             constexpr auto kw_only_pos = constexpr_first<is_kw_only, Extra...>();
+//             constexpr auto pos_only_pos = constexpr_first<is_pos_only, Extra...>();
+//             static_assert(!(has_kw_only_args && has_pos_only_args) || pos_only_pos < kw_only_pos, "py::pos_only must come before py::kw_only");
+//         }
 
-        /* Generate a readable signature describing the function's arguments and return value types */
-        static constexpr auto signature = const_name("(") + cast_in::arg_names + const_name(") -> ") + cast_out::name;
-        PYBIND11_DESCR_CONSTEXPR auto types = decltype(signature)::types();
+//         /* Generate a readable signature describing the function's arguments and return value types */
+//         static constexpr auto signature = const_name("(") + cast_in::arg_names + const_name(") -> ") + cast_out::name;
+//         PYBIND11_DESCR_CONSTEXPR auto types = decltype(signature)::types();
 
-        /* Register the function with Python from generic (non-templated) code */
-        // Pass on the ownership over the `unique_rec` to `initialize_generic`. `rec` stays valid.
-        initialize_generic(std::move(unique_rec), signature.text, types.data(), sizeof...(Args));
+//         /* Register the function with Python from generic (non-templated) code */
+//         // Pass on the ownership over the `unique_rec` to `initialize_generic`. `rec` stays valid.
+//         initialize_generic(std::move(unique_rec), signature.text, types.data(), sizeof...(Args));
 
-        /* Stash some additional information used by an important optimization in 'functional.h' */
-        using FunctionType = Return (*)(Args...);
-        constexpr bool is_function_ptr =
-            std::is_convertible<Func, FunctionType>::value &&
-            sizeof(capture) == sizeof(void *);
-        if (is_function_ptr) {
-            rec->is_stateless = true;
-            rec->data[1] = const_cast<void *>(reinterpret_cast<const void *>(&typeid(FunctionType)));
-        }
-    }
+//         /* Stash some additional information used by an important optimization in 'functional.h' */
+//         using FunctionType = Return (*)(Args...);
+//         constexpr bool is_function_ptr =
+//             std::is_convertible<Func, FunctionType>::value &&
+//             sizeof(capture) == sizeof(void *);
+//         if (is_function_ptr) {
+//             rec->is_stateless = true;
+//             rec->data[1] = const_cast<void *>(reinterpret_cast<const void *>(&typeid(FunctionType)));
+//         }
+//     }
 
     // Utility class that keeps track of all duplicated strings, and cleans them up in its destructor,
     // unless they are released. Basically a RAII-solution to deal with exceptions along the way.

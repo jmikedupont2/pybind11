@@ -879,107 +879,108 @@ struct polymorphic_type_hook_base
 {
     static const void *get(const itype *src, const std::type_info*&) { return src; }
 };
-template <typename itype>
-struct polymorphic_type_hook_base<itype, detail::enable_if_t<std::is_polymorphic<itype>::value>>
-{
-    static const void *get(const itype *src, const std::type_info*& type) {
-        type = src ? &typeid(*src) : nullptr;
-        return dynamic_cast<const void*>(src);
-    }
-};
+// template <typename itype>
+// struct polymorphic_type_hook_base<itype, detail::enable_if_t<std::is_polymorphic<itype>::value>>
+// {
+//     static const void *get(const itype *src, const std::type_info*& type) {
+//       type = src ? &typeid(*src) : nullptr;
+//         return dynamic_cast<const void*>(src);
+//     }
+// };
+
 template <typename itype, typename SFINAE = void>
 struct polymorphic_type_hook : public polymorphic_type_hook_base<itype> {};
 
 PYBIND11_NAMESPACE_BEGIN(detail)
 
-/// Generic type caster for objects stored on the heap
-template <typename type> class type_caster_base : public type_caster_generic {
-    using itype = intrinsic_t<type>;
+// /// Generic type caster for objects stored on the heap
+// // template <typename type> class type_caster_base : public type_caster_generic {
+// //     using itype = intrinsic_t<type>;
 
-public:
-    static constexpr auto name = const_name<type>();
+// // public:
+// //     static constexpr auto name = const_name<type>();
 
-    type_caster_base() : type_caster_base(typeid(type)) { }
-    explicit type_caster_base(const std::type_info &info) : type_caster_generic(info) { }
+// //     type_caster_base() : type_caster_base(typeid(type)) { }
+// //     explicit type_caster_base(const std::type_info &info) : type_caster_generic(info) { }
 
-    static handle cast(const itype &src, return_value_policy policy, handle parent) {
-        if (policy == return_value_policy::automatic || policy == return_value_policy::automatic_reference)
-            policy = return_value_policy::copy;
-        return cast(&src, policy, parent);
-    }
+//     // static handle cast(const itype &src, return_value_policy policy, handle parent) {
+//     //     if (policy == return_value_policy::automatic || policy == return_value_policy::automatic_reference)
+//     //         policy = return_value_policy::copy;
+//     //     return cast(&src, policy, parent);
+//     // }
 
-    static handle cast(itype &&src, return_value_policy, handle parent) {
-        return cast(&src, return_value_policy::move, parent);
-    }
+//     static handle cast(itype &&src, return_value_policy, handle parent) {
+//         return cast(&src, return_value_policy::move, parent);
+//     }
 
-    // Returns a (pointer, type_info) pair taking care of necessary type lookup for a
-    // polymorphic type (using RTTI by default, but can be overridden by specializing
-    // polymorphic_type_hook). If the instance isn't derived, returns the base version.
-    static std::pair<const void *, const type_info *> src_and_type(const itype *src) {
-        auto &cast_type = typeid(itype);
-        const std::type_info *instance_type = nullptr;
-        const void *vsrc = polymorphic_type_hook<itype>::get(src, instance_type);
-        if (instance_type && !same_type(cast_type, *instance_type)) {
-            // This is a base pointer to a derived type. If the derived type is registered
-            // with pybind11, we want to make the full derived object available.
-            // In the typical case where itype is polymorphic, we get the correct
-            // derived pointer (which may be != base pointer) by a dynamic_cast to
-            // most derived type. If itype is not polymorphic, we won't get here
-            // except via a user-provided specialization of polymorphic_type_hook,
-            // and the user has promised that no this-pointer adjustment is
-            // required in that case, so it's OK to use static_cast.
-            if (const auto *tpi = get_type_info(*instance_type))
-                return {vsrc, tpi};
-        }
-        // Otherwise we have either a nullptr, an `itype` pointer, or an unknown derived pointer, so
-        // don't do a cast
-        return type_caster_generic::src_and_type(src, cast_type, instance_type);
-    }
+//     // Returns a (pointer, type_info) pair taking care of necessary type lookup for a
+//     // polymorphic type (using RTTI by default, but can be overridden by specializing
+//     // polymorphic_type_hook). If the instance isn't derived, returns the base version.
+//     static std::pair<const void *, const type_info *> src_and_type(const itype *src) {
+//         auto &cast_type = typeid(itype);
+//         const std::type_info *instance_type = nullptr;
+//         const void *vsrc = polymorphic_type_hook<itype>::get(src, instance_type);
+//         if (instance_type && !same_type(cast_type, *instance_type)) {
+//             // This is a base pointer to a derived type. If the derived type is registered
+//             // with pybind11, we want to make the full derived object available.
+//             // In the typical case where itype is polymorphic, we get the correct
+//             // derived pointer (which may be != base pointer) by a dynamic_cast to
+//             // most derived type. If itype is not polymorphic, we won't get here
+//             // except via a user-provided specialization of polymorphic_type_hook,
+//             // and the user has promised that no this-pointer adjustment is
+//             // required in that case, so it's OK to use static_cast.
+//             if (const auto *tpi = get_type_info(*instance_type))
+//                 return {vsrc, tpi};
+//         }
+//         // Otherwise we have either a nullptr, an `itype` pointer, or an unknown derived pointer, so
+//         // don't do a cast
+//         return type_caster_generic::src_and_type(src, cast_type, instance_type);
+//     }
 
-    static handle cast(const itype *src, return_value_policy policy, handle parent) {
-        auto st = src_and_type(src);
-        return type_caster_generic::cast(
-            st.first, policy, parent, st.second,
-            make_copy_constructor(src), make_move_constructor(src));
-    }
+//     static handle cast(const itype *src, return_value_policy policy, handle parent) {
+//         auto st = src_and_type(src);
+//         return type_caster_generic::cast(
+//             st.first, policy, parent, st.second,
+//             make_copy_constructor(src), make_move_constructor(src));
+//     }
 
-    static handle cast_holder(const itype *src, const void *holder) {
-        auto st = src_and_type(src);
-        return type_caster_generic::cast(
-            st.first, return_value_policy::take_ownership, {}, st.second,
-            nullptr, nullptr, holder);
-    }
+//     static handle cast_holder(const itype *src, const void *holder) {
+//         auto st = src_and_type(src);
+//         return type_caster_generic::cast(
+//             st.first, return_value_policy::take_ownership, {}, st.second,
+//             nullptr, nullptr, holder);
+//     }
 
-    template <typename T> using cast_op_type = detail::cast_op_type<T>;
+//     template <typename T> using cast_op_type = detail::cast_op_type<T>;
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    operator itype*() { return (type *) value; }
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    operator itype&() { if (!value) throw reference_cast_error(); return *((itype *) value); }
+//     // NOLINTNEXTLINE(google-explicit-constructor)
+//     operator itype*() { return (type *) value; }
+//     // NOLINTNEXTLINE(google-explicit-constructor)
+//     operator itype&() { if (!value) throw reference_cast_error(); return *((itype *) value); }
 
-protected:
-    using Constructor = void *(*)(const void *);
+// protected:
+//     using Constructor = void *(*)(const void *);
 
-    /* Only enabled when the types are {copy,move}-constructible *and* when the type
-       does not have a private operator new implementation. A comma operator is used in the decltype
-       argument to apply SFINAE to the public copy/move constructors.*/
-    template <typename T, typename = enable_if_t<is_copy_constructible<T>::value>>
-    static auto make_copy_constructor(const T *) -> decltype(new T(std::declval<const T>()), Constructor{}) {
-        return [](const void *arg) -> void * {
-            return new T(*reinterpret_cast<const T *>(arg));
-        };
-    }
+//     /* Only enabled when the types are {copy,move}-constructible *and* when the type
+//        does not have a private operator new implementation. A comma operator is used in the decltype
+//        argument to apply SFINAE to the public copy/move constructors.*/
+//     template <typename T, typename = enable_if_t<is_copy_constructible<T>::value>>
+//     static auto make_copy_constructor(const T *) -> decltype(new T(std::declval<const T>()), Constructor{}) {
+//         return [](const void *arg) -> void * {
+//             return new T(*reinterpret_cast<const T *>(arg));
+//         };
+//     }
 
-    template <typename T, typename = enable_if_t<std::is_move_constructible<T>::value>>
-    static auto make_move_constructor(const T *) -> decltype(new T(std::declval<T&&>()), Constructor{}) {
-        return [](const void *arg) -> void * {
-            return new T(std::move(*const_cast<T *>(reinterpret_cast<const T *>(arg))));
-        };
-    }
+//     template <typename T, typename = enable_if_t<std::is_move_constructible<T>::value>>
+//     static auto make_move_constructor(const T *) -> decltype(new T(std::declval<T&&>()), Constructor{}) {
+//         return [](const void *arg) -> void * {
+//             return new T(std::move(*const_cast<T *>(reinterpret_cast<const T *>(arg))));
+//         };
+//     }
 
-    static Constructor make_copy_constructor(...) { return nullptr; }
-    static Constructor make_move_constructor(...) { return nullptr; }
-};
+//     static Constructor make_copy_constructor(...) { return nullptr; }
+//     static Constructor make_move_constructor(...) { return nullptr; }
+// };
 
 PYBIND11_NAMESPACE_END(detail)
 PYBIND11_NAMESPACE_END(PYBIND11_NAMESPACE)

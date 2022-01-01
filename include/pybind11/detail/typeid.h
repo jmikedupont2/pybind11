@@ -47,9 +47,9 @@ PYBIND11_NAMESPACE_END(detail)
 
 /// Return a string representation of a C++ type
 template <typename T> static std::string type_id() {
-    std::string name(typeid(T).name());
-    detail::clean_type_id(name);
-    return name;
+  //std::string name(typeid(T).name());
+  //  detail::clean_type_id(name);
+    return "TODO";
 }
 
 PYBIND11_NAMESPACE_END(PYBIND11_NAMESPACE)

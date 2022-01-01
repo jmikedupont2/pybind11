@@ -36,9 +36,9 @@ struct descr {
     // NOLINTNEXTLINE(google-explicit-constructor)
     constexpr descr(char c, Chars... cs) : text{c, static_cast<char>(cs)..., '\0'} { }
 
-    static constexpr std::array<const std::type_info *, sizeof...(Ts) + 1> types() {
-        return {{&typeid(Ts)..., nullptr}};
-    }
+  //static constexpr std::array<const std::type_info *, sizeof...(Ts) + 1> types() {
+      //return {{&typeid(Ts)..., nullptr}};
+  // }
 };
 
 template <size_t N1, size_t N2, typename... Ts1, typename... Ts2, size_t... Is1, size_t... Is2>
