@@ -85,7 +85,7 @@ struct numpy_type_info {
 struct numpy_internals {
     std::unordered_map<std::type_index, numpy_type_info> registered_dtypes;
 
-    numpy_type_info *get_type_info(const std::type_info& tinfo, bool throw_if_missing = true) {
+    numpy_type_info *get_type_info(const mtype_info& tinfo, bool throw_if_missing = true) {
         auto it = registered_dtypes.find(std::type_index(tinfo));
         if (it != registered_dtypes.end())
             return &(it->second);
@@ -1143,7 +1143,7 @@ struct field_descriptor {
 
 PYBIND11_NOINLINE void register_structured_dtype(
     any_container<field_descriptor> fields,
-    const std::type_info& tinfo, ssize_t itemsize,
+    const mtype_info& tinfo, ssize_t itemsize,
     bool (*direct_converter)(PyObject *, void *&)) {
 
     auto& numpy_internals = get_numpy_internals();

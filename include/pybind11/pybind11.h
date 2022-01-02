@@ -13,6 +13,41 @@
 #include "attr.h"
 #include "gil.h"
 #include "options.h"
+
+std::ostream& operator<<(std::ostream& os, const PyObject& dt)
+{
+  long vl = (long ) &dt;
+    
+  PyObject * po = const_cast<PyObject*>(&dt);
+  if (vl  <= 0L ){
+    os << "PyObject: NULL";
+    return os;
+  }
+  else {
+    os << "PyObject2: " << vl ;
+  }
+  const char * bytes = PyUnicode_AsUTF8(PyObject_Str(po));
+  //const char *bytes = PyBytes_AsString(
+  //				       PyObject_Str(
+  //						    po));
+  
+  if (po) {
+    os << "PyObject: " << vl
+      // << " str: " << bytes;
+       << " type: "
+       << po->ob_type
+       << " refcnt: "
+       << po->ob_refcnt;
+  }
+  else {
+    os << "NULL PYOBJECT";
+  }
+  os << " PyObjectStr {{ " << bytes << " }} ";
+    
+  return os;
+}
+
+
 #include "detail/class.h"
 #include "detail/init.h"
 
@@ -47,6 +82,7 @@
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
+
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 
@@ -276,7 +312,8 @@ protected:
             sizeof(capture) == sizeof(void *);
         if (is_function_ptr) {
             rec->is_stateless = true;
-            rec->data[1] = const_cast<void *>(reinterpret_cast<const void *>(&typeid(FunctionType)));
+            rec->data[1] = const_cast<void *>(reinterpret_cast<const void *>(&mtypeid(FunctionType)));
+
         }
     }
 
@@ -302,7 +339,7 @@ protected:
 
     /// Register a function call with Python (generic non-templated code goes here)
     void initialize_generic(unique_function_record &&unique_rec, const char *text,
-                            const std::type_info *const *types, size_t args) {
+                            const mtype_info *const *types, size_t args) {
         // Do NOT receive `unique_rec` by value. If this function fails to move out the unique_ptr,
         // we do not want this to destuct the pointer. `initialize` (the caller) still relies on the
         // pointee being alive after this call. Only move out if a `capsule` is going to keep it alive.
@@ -381,7 +418,7 @@ protected:
                 if (!is_starred)
                     arg_index++;
             } else if (c == '%') {
-                const std::type_info *t = types[type_index++];
+                const mtype_info *t = types[type_index++];
                 if (!t)
                     pybind11_fail("Internal error while parsing type signature (1)");
                 if (auto tinfo = detail::get_type_info(*t)) {
@@ -595,6 +632,12 @@ protected:
 
     /// Main dispatch logic for calls to functions bound using pybind11
     static PyObject *dispatcher(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
+      // entry point
+        std::cerr << "pybind11_dispatch:"
+		  << " self: " << *self
+		  << " args: " << *args_in
+		  << " kwargs: "<< *kwargs_in << std::endl;
+	
         using namespace detail;
 
         /* Iterator over the list of potentially admissible overloads */
@@ -1188,12 +1231,14 @@ protected:
         tinfo->module_local = rec.module_local;
 
         auto &internals = get_internals();
-        auto tindex = std::type_index(*rec.type);
-        tinfo->direct_conversions = &internals.direct_conversions[tindex];
-        if (rec.module_local)
-            get_local_internals().registered_types_cpp[tindex] = tinfo;
-        else
-            internals.registered_types_cpp[tindex] = tinfo;
+        auto tindex = mtype_index(*rec.type);
+	tinfo->direct_conversions = &internals.direct_conversions[tindex];
+
+        if (rec.module_local){
+	  get_local_internals().registered_types_cpp[tindex] = tinfo;
+	} else{
+	  internals.registered_types_cpp[tindex] = tinfo;
+	}
         internals.registered_types_py[(PyTypeObject *) m_ptr] = { tinfo };
 
         if (rec.bases.size() > 1 || rec.multiple_inheritance) {
@@ -1334,7 +1379,7 @@ public:
     using type = type_;
     using type_alias = detail::exactly_one_t<is_subtype, void, options...>;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
-    using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
+    using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<mtype>, options...>;
 
     static_assert(detail::all_of<is_valid_class_option<options>...>::value,
             "Unknown/invalid class_ template parameters provided");
@@ -1359,7 +1404,7 @@ public:
         type_record record;
         record.scope = scope;
         record.name = name;
-        record.type = &typeid(type);
+        record.type = &mtypeid(type);
         record.type_size = sizeof(conditional_t<has_alias, type_alias, type>);
         record.type_align = alignof(conditional_t<has_alias, type_alias, type>&);
         record.holder_size = sizeof(holder_type);
@@ -1379,13 +1424,14 @@ public:
 
         if (has_alias) {
             auto &instances = record.module_local ? get_local_internals().registered_types_cpp : get_internals().registered_types_cpp;
-            instances[std::type_index(typeid(type_alias))] = instances[std::type_index(typeid(type))];
+            // instances[std::type_index(mtypeid(type_alias))] = instances[std::type_index(mtypeid(type))];
+	    assert(0);
         }
     }
 
     template <typename Base, detail::enable_if_t<is_base<Base>::value, int> = 0>
     static void add_base(detail::type_record &rec) {
-        rec.add_base(typeid(Base), [](void *src) -> void * {
+        rec.add_base(mtypeid(Base), [](void *src) -> void * {
             return static_cast<Base *>(reinterpret_cast<type *>(src));
         });
     }
@@ -1591,14 +1637,15 @@ private:
             const holder_type * /* unused */, const std::enable_shared_from_this<T> * /* dummy */) {
 
         auto sh = std::dynamic_pointer_cast<typename holder_type::element_type>(
-                detail::try_get_shared_from_this(v_h.value_ptr<type>()));
+										v_h.value_ptr()
+										);
         if (sh) {
             new (std::addressof(v_h.holder<holder_type>())) holder_type(std::move(sh));
             v_h.set_holder_constructed();
         }
 
         if (!v_h.holder_constructed() && inst->owned) {
-            new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<type>());
+            new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<mtype>());
             v_h.set_holder_constructed();
         }
     }
@@ -1620,7 +1667,7 @@ private:
             init_holder_from_existing(v_h, holder_ptr, std::is_copy_constructible<holder_type>());
             v_h.set_holder_constructed();
         } else if (inst->owned || detail::always_construct_holder<holder_type>::value) {
-            new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<type>());
+            new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<mtype>());
             v_h.set_holder_constructed();
         }
     }
@@ -1630,12 +1677,19 @@ private:
     /// optional pointer to an existing holder to use; if not specified and the instance is
     /// `.owned`, a new holder will be constructed to manage the value pointer.
     static void init_instance(detail::instance *inst, const void *holder_ptr) {
-        auto v_h = inst->get_value_and_holder(detail::get_type_info(typeid(type)));
+      std::cout << "init_instance" << std::endl;
+        auto v_h = inst->get_value_and_holder(detail::get_type_info(mtypeid(type)));
         if (!v_h.instance_registered()) {
             register_instance(inst, v_h.value_ptr(), v_h.type);
             v_h.set_instance_registered();
         }
-        init_holder(inst, v_h, (const holder_type *) holder_ptr, v_h.value_ptr<type>());
+	//int v = type;
+	//const pybind11::class_<MContext>::holder_type* aht = v_h.value_ptr<mtype>();
+	
+	init_holder(inst, v_h, (const holder_type *) holder_ptr
+		    , v_h.value_ptr()
+		    );
+	//assert(0);
     }
 
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.
@@ -1652,7 +1706,7 @@ private:
             v_h.set_holder_constructed(false);
         }
         else {
-            detail::call_operator_delete(v_h.value_ptr<type>(),
+            detail::call_operator_delete(v_h.value_ptr<mtype>(),
                 v_h.type->type_size,
                 v_h.type->type_align
             );
@@ -2070,7 +2124,7 @@ iterator make_iterator_impl(Iterator first, Sentinel last, Extra &&... extra) {
     using state = detail::iterator_state<Access, Policy, Iterator, Sentinel, ValueType, Extra...>;
     // TODO: state captures only the types of Extra, not the values
 
-    if (!detail::get_type_info(typeid(state), false)) {
+    if (!detail::get_type_info(mtypeid(state), false)) {
         class_<state>(handle(), "iterator", pybind11::module_local())
             .def("__iter__", [](state &s) -> state& { return s; })
             .def("__next__", [](state &s) -> ValueType {
@@ -2183,7 +2237,7 @@ template <typename InputType, typename OutputType> void implicitly_convertible()
         return result;
     };
 
-    if (auto tinfo = detail::get_type_info(typeid(OutputType)))
+    if (auto tinfo = detail::get_type_info(mtypeid(OutputType)))
         tinfo->implicit_conversions.push_back(implicit_caster);
     else
         pybind11_fail("implicitly_convertible: Unable to find type " + type_id<OutputType>());
@@ -2437,7 +2491,7 @@ PYBIND11_NAMESPACE_END(detail)
   :return: The Python method by this name from the object or an empty function wrapper.
  \endrst */
 template <class T> function get_override(const T *this_ptr, const char *name) {
-    auto tinfo = detail::get_type_info(typeid(T));
+    auto tinfo = detail::get_type_info(mtypeid(T));
     return tinfo ? detail::get_type_override(this_ptr, tinfo, name) : function();
 }
 

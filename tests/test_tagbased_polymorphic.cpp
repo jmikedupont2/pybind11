@@ -23,7 +23,7 @@ struct Animal
         Dog = 100, Labrador, Chihuahua, LastDog = 199,
         Cat = 200, Panther, LastCat = 299
     };
-    static const std::type_info* type_of_kind(Kind kind);
+    static const mtype_info* type_of_kind(Kind kind);
     static std::string name_of_kind(Kind kind);
 
     const Kind kind;
@@ -85,7 +85,7 @@ std::vector<std::unique_ptr<Animal>> create_zoo()
     return ret;
 }
 
-const std::type_info* Animal::type_of_kind(Kind kind)
+const mtype_info* Animal::type_of_kind(Kind kind)
 {
     switch (kind) {
         case Kind::Unknown:
@@ -116,7 +116,7 @@ namespace pybind11 {
     template <typename itype>
     struct polymorphic_type_hook<itype, detail::enable_if_t<std::is_base_of<Animal, itype>::value>>
     {
-        static const void *get(const itype *src, const std::type_info*& type)
+        static const void *get(const itype *src, const mtype_info*& type)
         { type = src ? Animal::type_of_kind(src->kind) : nullptr; return src; }
     };
 } // namespace pybind11

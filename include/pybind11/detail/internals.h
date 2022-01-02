@@ -105,16 +105,16 @@ inline void tls_replace_value(PYBIND11_TLS_KEY_REF key, void *value) {
 // which works.  If not under a known-good stl, provide our own name-based hash and equality
 // functions that use the type name.
 #if defined(__GLIBCXX__)
-inline bool same_type(const std::type_info &lhs, const std::type_info &rhs) { return lhs == rhs; }
-using type_hash = std::hash<std::type_index>;
-using type_equal_to = std::equal_to<std::type_index>;
+inline bool same_type(const mtype_info &lhs, const mtype_info &rhs) { return lhs == rhs; }
+using type_hash = std::hash<mtype_index>;
+using type_equal_to = std::equal_to<mtype_index>;
 #else
-inline bool same_type(const std::type_info &lhs, const std::type_info &rhs) {
+inline bool same_type(const mtype_info &lhs, const mtype_info &rhs) {
     return lhs.name() == rhs.name() || std::strcmp(lhs.name(), rhs.name()) == 0;
 }
 
 struct type_hash {
-    size_t operator()(const std::type_index &t) const {
+    size_t operator()(const mtype_index &t) const {
         size_t hash = 5381;
         const char *ptr = t.name();
         while (auto c = static_cast<unsigned char>(*ptr++))
@@ -124,14 +124,14 @@ struct type_hash {
 };
 
 struct type_equal_to {
-    bool operator()(const std::type_index &lhs, const std::type_index &rhs) const {
+    bool operator()(const mtype_index &lhs, const mtype_index &rhs) const {
         return lhs.name() == rhs.name() || std::strcmp(lhs.name(), rhs.name()) == 0;
     }
 };
 #endif
 
 template <typename value_type>
-using type_map = std::unordered_map<std::type_index, value_type, type_hash, type_equal_to>;
+using type_map = std::unordered_map<mtype_index, value_type, type_hash, type_equal_to>;
 
 struct override_hash {
     inline size_t operator()(const std::pair<const PyObject *, const char *>& v) const {
@@ -145,7 +145,7 @@ struct override_hash {
 /// Whenever binary incompatible changes are made to this structure,
 /// `PYBIND11_INTERNALS_VERSION` must be incremented.
 struct internals {
-    type_map<type_info *> registered_types_cpp; // std::type_index -> pybind11's type information
+    type_map<type_info *> registered_types_cpp; // mtype_index -> pybind11's type information
     std::unordered_map<PyTypeObject *, std::vector<type_info *>> registered_types_py; // PyTypeObject* -> base type_info(s)
     std::unordered_multimap<const void *, instance*> registered_instances; // void * -> instance*
     std::unordered_set<std::pair<const PyObject *, const char *>, override_hash> inactive_override_cache;
@@ -187,13 +187,13 @@ struct internals {
 /// Changes to this struct also require bumping `PYBIND11_INTERNALS_VERSION`.
 struct type_info {
     PyTypeObject *type;
-    const std::type_info *cpptype;
+  const mtype_info *cpptype;
     size_t type_size, type_align, holder_size_in_ptrs;
     void *(*operator_new)(size_t);
     void (*init_instance)(instance *, const void *);
     void (*dealloc)(value_and_holder &v_h);
     std::vector<PyObject *(*)(PyObject *, PyTypeObject *)> implicit_conversions;
-    std::vector<std::pair<const std::type_info *, void *(*)(void *)>> implicit_casts;
+    std::vector<std::pair<const mtype_info *, void *(*)(void *)>> implicit_casts;
     std::vector<bool (*)(PyObject *, void *&)> *direct_conversions;
     buffer_info *(*get_buffer)(PyObject *, void *) = nullptr;
     void *get_buffer_data = nullptr;

@@ -51,7 +51,7 @@ public:
                 while (rec != nullptr) {
                     if (rec->is_stateless
                         && same_type(typeid(function_type),
-                                     *reinterpret_cast<const std::type_info *>(rec->data[1]))) {
+                                     *reinterpret_cast<const mtype_info *>(rec->data[1]))) {
                         struct capture {
                             function_type f;
                         };

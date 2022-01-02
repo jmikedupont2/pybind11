@@ -11,6 +11,7 @@
 
 #include "../attr.h"
 #include "../options.h"
+#include <iostream>
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 PYBIND11_NAMESPACE_BEGIN(detail)
@@ -169,6 +170,11 @@ extern "C" inline PyObject *pybind11_meta_getattro(PyObject *obj, PyObject *name
 
 /// metaclass `__call__` function that is used to create all pybind11 objects.
 extern "C" inline PyObject *pybind11_meta_call(PyObject *type, PyObject *args, PyObject *kwargs) {
+  std::cerr << "pybind11_meta_call : "
+	    << " type: "  << *type
+	    << " args: "  << *args
+	    << " kwargs " << *kwargs
+	    << std::endl;
 
     // use the default metaclass call to create/initialize the object
     PyObject *self = PyType_Type.tp_call(type, args, kwargs);
@@ -206,13 +212,17 @@ extern "C" inline void pybind11_meta_dealloc(PyObject *obj) {
         found_type->second[0]->type == type) {
 
         auto *tinfo = found_type->second[0];
-        auto tindex = std::type_index(*tinfo->cpptype);
+        auto tindex = mtype_index(*tinfo->cpptype);
+	
         internals.direct_conversions.erase(tindex);
 
         if (tinfo->module_local)
-            get_local_internals().registered_types_cpp.erase(tindex);
-        else
-            internals.registered_types_cpp.erase(tindex);
+	  {
+	    get_local_internals().registered_types_cpp.erase(tindex);
+	  }
+        else {
+	  internals.registered_types_cpp.erase(tindex);
+	}
         internals.registered_types_py.erase(tinfo->type);
 
         // Actually just `std::erase_if`, but that's only available in C++20
@@ -311,8 +321,10 @@ inline bool deregister_instance_impl(void *ptr, instance *self) {
 
 inline void register_instance(instance *self, void *valptr, const type_info *tinfo) {
     register_instance_impl(valptr, self);
-    if (!tinfo->simple_ancestors)
+    if (tinfo) {
+      if (!tinfo->simple_ancestors)
         traverse_offset_bases(valptr, tinfo, self, register_instance_impl);
+    }
 }
 
 inline bool deregister_instance(instance *self, void *valptr, const type_info *tinfo) {

@@ -13,6 +13,7 @@
 #include "cast.h"
 
 #include <functional>
+#include "mrtti.h"
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 
@@ -260,7 +261,8 @@ struct type_record {
     const char *name = nullptr;
 
     // Pointer to RTTI type_info data structure
-    const std::type_info *type = nullptr;
+  //const std::type_info *type = nullptr;
+  const mtype_info *type = nullptr;
 
     /// How large is the underlying C++ type?
     size_t type_size = 0;
@@ -310,7 +312,7 @@ struct type_record {
     /// Is the class inheritable from python classes?
     bool is_final : 1;
 
-    PYBIND11_NOINLINE void add_base(const std::type_info &base, void *(*caster)(void *)) {
+    PYBIND11_NOINLINE void add_base(const mtype_info &base, void *(*caster)(void *)) {
         auto base_info = detail::get_type_info(base, false);
         if (!base_info) {
             std::string tname(base.name());
@@ -492,7 +494,7 @@ struct process_attribute<T, enable_if_t<is_pyobject<T>::value>> : process_attrib
 /// Process a parent class attribute (deprecated, does not support multiple inheritance)
 template <typename T>
 struct process_attribute<base<T>> : process_attribute_default<base<T>> {
-    static void init(const base<T> &, type_record *r) { r->add_base(typeid(T), nullptr); }
+    static void init(const base<T> &, type_record *r) { r->add_base(mtypeid(T), nullptr); }
 };
 
 /// Process a multiple inheritance attribute

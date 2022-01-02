@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "../mrtti.h"
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 PYBIND11_NAMESPACE_BEGIN(detail)
@@ -170,6 +171,10 @@ inline const std::vector<detail::type_info *> &all_type_info(PyTypeObject *type)
  * ancestors are pybind11-registered.  Throws an exception if there are multiple bases--use
  * `all_type_info` instead if you want to support multiple bases.
  */
+PYBIND11_NOINLINE detail::type_info* get_type_info(const mtype_info & type) {
+  return 0;
+}
+
 PYBIND11_NOINLINE detail::type_info* get_type_info(PyTypeObject *type) {
     auto &bases = all_type_info(type);
     if (bases.empty())
@@ -179,24 +184,26 @@ PYBIND11_NOINLINE detail::type_info* get_type_info(PyTypeObject *type) {
     return bases.front();
 }
 
-inline detail::type_info *get_local_type_info(const std::type_index &tp) {
-    auto &locals = get_local_internals().registered_types_cpp;
-    auto it = locals.find(tp);
-    if (it != locals.end())
-        return it->second;
+inline detail::type_info *get_local_type_info(const mtype_index &tp) {
+  //auto &locals = get_local_internals().registered_types_cpp;
+    //auto it = locals.find(tp); TODO
+    //if (it != locals.end())
+    //    return it->second;
+  assert(0);
     return nullptr;
 }
 
-inline detail::type_info *get_global_type_info(const std::type_index &tp) {
-    auto &types = get_internals().registered_types_cpp;
-    auto it = types.find(tp);
-    if (it != types.end())
-        return it->second;
-    return nullptr;
+inline detail::type_info *get_global_type_info(const mtype_index &tp) {
+  auto &types = get_internals().registered_types_cpp;
+  auto it = types.find(tp);
+  if (it != types.end())
+    return it->second;
+  
+  return nullptr;
 }
 
 /// Return the type info for a given C++ type; on lookup failure can either throw or return nullptr.
-PYBIND11_NOINLINE detail::type_info *get_type_info(const std::type_index &tp,
+PYBIND11_NOINLINE detail::type_info *get_type_info(const mtype_index &tp,
                                                           bool throw_if_missing = false) {
     if (auto ltype = get_local_type_info(tp))
         return ltype;
@@ -204,16 +211,19 @@ PYBIND11_NOINLINE detail::type_info *get_type_info(const std::type_index &tp,
         return gtype;
 
     if (throw_if_missing) {
-        std::string tname = tp.name();
-        detail::clean_type_id(tname);
+      std::string tname = tp.name();
+      //detail::clean_type_id(tname);
+      assert(0);
         pybind11_fail("pybind11::detail::get_type_info: unable to find type info for \"" + tname + "\"");
     }
     return nullptr;
 }
 
-PYBIND11_NOINLINE handle get_type_handle(const std::type_info &tp, bool throw_if_missing) {
-    detail::type_info *type_info = get_type_info(tp, throw_if_missing);
-    return handle(type_info ? ((PyObject *) type_info->type) : nullptr);
+PYBIND11_NOINLINE handle get_type_handle(const mtype_info &tp, bool throw_if_missing) {
+  //detail::type_info *type_info = get_type_info(tp, throw_if_missing);
+  // return handle(type_info ? ((PyObject *) type_info->type) : nullptr);
+  assert(0);
+   return handle(nullptr);
 }
 
 // Searches the inheritance graph for a registered Python instance, using all_type_info().
@@ -427,7 +437,7 @@ PYBIND11_NOINLINE void instance::deallocate_layout() {
         PyMem_Free(nonsimple.values_and_holders);
 }
 
-PYBIND11_NOINLINE bool isinstance_generic(handle obj, const std::type_info &tp) {
+PYBIND11_NOINLINE bool isinstance_generic(handle obj, const mtype_info &tp) {
     handle type = detail::get_type_handle(tp, false);
     if (!type)
         return false;
@@ -520,7 +530,7 @@ inline PyObject *make_new_instance(PyTypeObject *type);
 
 class type_caster_generic {
 public:
-    PYBIND11_NOINLINE explicit type_caster_generic(const std::type_info &type_info)
+    PYBIND11_NOINLINE explicit type_caster_generic(const mtype_info &type_info)
         : typeinfo(get_type_info(type_info)), cpptype(&type_info) {}
 
     explicit type_caster_generic(const type_info *typeinfo)
@@ -777,7 +787,7 @@ public:
     // isn't needed or can't be used.  If the type is unknown, sets the error and returns a pair
     // with .second = nullptr.  (p.first = nullptr is not an error: it becomes None).
     PYBIND11_NOINLINE static std::pair<const void *, const type_info *> src_and_type(
-            const void *src, const std::type_info &cast_type, const std::type_info *rtti_type = nullptr) {
+            const void *src, const mtype_info &cast_type, const mtype_info *rtti_type = nullptr) {
         if (auto *tpi = get_type_info(cast_type))
             return {src, const_cast<const type_info *>(tpi)};
 
@@ -790,7 +800,7 @@ public:
     }
 
     const type_info *typeinfo = nullptr;
-    const std::type_info *cpptype = nullptr;
+    const mtype_info *cpptype = nullptr;
     void *value = nullptr;
 };
 
@@ -855,7 +865,7 @@ PYBIND11_NAMESPACE_END(detail)
 
 // polymorphic_type_hook<itype>::get(src, tinfo) determines whether the object pointed
 // to by `src` actually is an instance of some class derived from `itype`.
-// If so, it sets `tinfo` to point to the std::type_info representing that derived
+// If so, it sets `tinfo` to point to the mtype_info representing that derived
 // type, and returns a pointer to the start of the most-derived object of that type
 // (in which `src` is a subobject; this will be the same address as `src` in most
 // single inheritance cases). If not, or if `src` is nullptr, it simply returns `src`
@@ -877,13 +887,13 @@ PYBIND11_NAMESPACE_END(detail)
 template <typename itype, typename SFINAE = void>
 struct polymorphic_type_hook_base
 {
-    static const void *get(const itype *src, const std::type_info*&) { return src; }
+    static const void *get(const itype *src, const mtype_info*&) { return src; }
 };
 template <typename itype>
 struct polymorphic_type_hook_base<itype, detail::enable_if_t<std::is_polymorphic<itype>::value>>
 {
-    static const void *get(const itype *src, const std::type_info*& type) {
-        type = src ? &typeid(*src) : nullptr;
+    static const void *get(const itype *src, const mtype_info*& type) {
+        type = src ? &mtypeidvar(*src) : nullptr;
         return dynamic_cast<const void*>(src);
     }
 };
@@ -899,8 +909,8 @@ template <typename type> class type_caster_base : public type_caster_generic {
 public:
     static constexpr auto name = const_name<type>();
 
-    type_caster_base() : type_caster_base(typeid(type)) { }
-    explicit type_caster_base(const std::type_info &info) : type_caster_generic(info) { }
+    type_caster_base() : type_caster_base(mtypeid(type)) { }
+    explicit type_caster_base(const mtype_info &info) : type_caster_generic(info) { }
 
     static handle cast(const itype &src, return_value_policy policy, handle parent) {
         if (policy == return_value_policy::automatic || policy == return_value_policy::automatic_reference)
@@ -916,8 +926,8 @@ public:
     // polymorphic type (using RTTI by default, but can be overridden by specializing
     // polymorphic_type_hook). If the instance isn't derived, returns the base version.
     static std::pair<const void *, const type_info *> src_and_type(const itype *src) {
-        auto &cast_type = typeid(itype);
-        const std::type_info *instance_type = nullptr;
+        auto &cast_type = mtypeid(itype);
+        const mtype_info *instance_type = nullptr;
         const void *vsrc = polymorphic_type_hook<itype>::get(src, instance_type);
         if (instance_type && !same_type(cast_type, *instance_type)) {
             // This is a base pointer to a derived type. If the derived type is registered

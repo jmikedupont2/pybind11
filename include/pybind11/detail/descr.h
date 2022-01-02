@@ -10,6 +10,7 @@
 #pragma once
 
 #include "common.h"
+#include "../mrtti.h"
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 PYBIND11_NAMESPACE_BEGIN(detail)
@@ -36,8 +37,10 @@ struct descr {
     // NOLINTNEXTLINE(google-explicit-constructor)
     constexpr descr(char c, Chars... cs) : text{c, static_cast<char>(cs)..., '\0'} { }
 
-    static constexpr std::array<const std::type_info *, sizeof...(Ts) + 1> types() {
-        return {{&typeid(Ts)..., nullptr}};
+    static constexpr std::array<const mtype_info *, sizeof...(Ts) + 1> types() {
+      return {{&mtypeid(Ts)..., nullptr}};
+
+      //return {};
     }
 };
 

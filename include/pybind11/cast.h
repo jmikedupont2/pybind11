@@ -1404,7 +1404,7 @@ handle type::handle_of() {
       "py::type::of<T> only supports the case where T is a registered C++ types."
     );
 
-    return detail::get_type_handle(typeid(T), true);
+    return detail::get_type_handle(mtypeid(T), true);
 }
 
 

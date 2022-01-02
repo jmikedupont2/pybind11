@@ -8,7 +8,7 @@
 */
 
 #pragma once
-
+#include "mrtti.h"
 #include "detail/common.h"
 #include "buffer_info.h"
 #include <utility>
@@ -32,7 +32,7 @@ struct arg; struct arg_v;
 
 PYBIND11_NAMESPACE_BEGIN(detail)
 class args_proxy;
-bool isinstance_generic(handle obj, const std::type_info &tp);
+bool isinstance_generic(handle obj, const mtype_info &tp);
 
 // Accessor forward declarations
 template <typename Policy> class accessor;
@@ -449,7 +449,12 @@ template <typename T, detail::enable_if_t<std::is_base_of<object, T>::value, int
 bool isinstance(handle obj) { return T::check_(obj); }
 
 template <typename T, detail::enable_if_t<!std::is_base_of<object, T>::value, int> = 0>
-bool isinstance(handle obj) { return detail::isinstance_generic(obj, typeid(T)); }
+bool isinstance(handle obj) {
+
+  // HACK return detail::isinstance_generic(obj, mtypeid(T));
+  assert(0);
+  return false;
+}
 
 template <> inline bool isinstance<handle>(handle) = delete;
 template <> inline bool isinstance<object>(handle obj) { return obj.ptr() != nullptr; }
