@@ -13,6 +13,35 @@
 #include "attr.h"
 #include "gil.h"
 #include "options.h"
+std::ostream& operator<<(std::ostream& os, const PyTypeObject& dt)
+{
+  long vl = (long ) &dt;
+    
+  PyTypeObject * po = const_cast<PyTypeObject*>(&dt);
+  if (vl  <= 0L ){
+    os << "PyObjectType: NULL";
+    return os;
+  }
+  else {
+    //    os << "PyObject2: " << vl ;
+  }
+  const char * bytes = PyUnicode_AsUTF8(PyObject_Str((PyObject*)po));
+  //const char *bytes = PyBytes_AsString(
+  //				       PyObject_Str(
+  //						    po));
+  
+  if (po) {
+    os << " PyObjectType: " << vl;
+      // << " str: " << bytes;
+  }
+  else {
+    os << "NULL PYOBJECTTYPE";
+  }
+  os << " PyObjectTypeStr {{ " << bytes << " }} ";
+    
+  return os;
+  
+}
 
 std::ostream& operator<<(std::ostream& os, const PyObject& dt)
 {
@@ -24,7 +53,7 @@ std::ostream& operator<<(std::ostream& os, const PyObject& dt)
     return os;
   }
   else {
-    os << "PyObject2: " << vl ;
+    //    os << "PyObject2: " << vl ;
   }
   const char * bytes = PyUnicode_AsUTF8(PyObject_Str(po));
   //const char *bytes = PyBytes_AsString(
@@ -32,11 +61,11 @@ std::ostream& operator<<(std::ostream& os, const PyObject& dt)
   //						    po));
   
   if (po) {
-    os << "PyObject: " << vl
+    os << " PyObject: " << vl
       // << " str: " << bytes;
-       << " type: "
-       << po->ob_type
-       << " refcnt: "
+       << " type: [[ "
+       << *po->ob_type
+       << "]] refcnt: "
        << po->ob_refcnt;
   }
   else {
@@ -82,6 +111,41 @@ std::ostream& operator<<(std::ostream& os, const PyObject& dt)
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wnoexcept-type"
 #endif
+
+const mtype_info handle_typeinfo("pybind11::handle");
+//template<>
+//constexpr const mtype_info& mtypeid1<pybind11::handle>(){
+//  return handle_typeinfo;
+//}
+
+
+//const mtype_info obj_info("pybind11::object");
+//template<>
+//constexpr const mtype_info& mtypeid1<pybind11::object>(){return obj_info; }
+
+#define autotype(X,Y)				\
+const mtype_info Y (  #X  );                    \
+template<>					\
+constexpr const mtype_info& mtypeid1< X >(){	\
+  return Y;                                     \
+}                                               \
+
+#define autotype2(X,Y)				\
+template<>					\
+constexpr const mtype_info& mtypeid2(X &){	\
+  return Y;                                     \
+}                                               \
+template<>					\
+constexpr const mtype_info& mtypeid2(const X &){	\
+  return Y;                                     \
+}                                               \
+
+
+
+autotype(pybind11::str, strinfo)
+autotype(pybind11::dict, dictinfo)
+autotype(pybind11::handle, handleinfo)
+autotype(pybind11::object, objectinfo) 
 
 
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
@@ -1756,6 +1820,9 @@ inline str enum_name(handle arg) {
     return "???";
 }
 
+
+
+
 struct enum_base {
     enum_base(const handle &base, const handle &parent) : m_base(base), m_parent(parent) { }
 
@@ -2606,3 +2673,31 @@ PYBIND11_NAMESPACE_END(PYBIND11_NAMESPACE)
 #if defined(__GNUC__) && __GNUC__ == 7
 #    pragma GCC diagnostic pop // -Wnoexcept-type
 #endif
+
+autotype(bool,debug_bool)
+autotype(bool (*)(const pybind11::object&, const pybind11::object&),debug_bool_____const_pybind____object___const_pybind____object__)
+
+
+autotype(const char (&)[1],debug_const_char1_______)
+autotype(const char (&)[9],debug_const_char9_______)
+
+autotype(const char* const&,debug_const_char__const_)
+autotype(int (*)(int, int),debug_int_____int__int_)
+autotype(pybind11::cpp_function,debug_pybind____cpp_function)
+autotype(pybind11::detail::value_and_holder,debug_pybind____detail__value_and_holder)
+autotype(pybind11::dict (*)(pybind11::handle),debug_pybind____dict_____pybind____handle_)
+autotype(pybind11::handle&,debug_pybind____handle_)
+autotype(pybind11::int_,debug_pybind____int_)
+autotype(pybind11::int_ (*)(const pybind11::object&),debug_pybind____int______const_pybind____object__)
+autotype(pybind11::none,debug_pybind____none)
+autotype(pybind11::object (*)(const pybind11::object&),debug_pybind____object_____const_pybind____object__)
+autotype(pybind11::object (*)(const pybind11::object&, const pybind11::object&),debug_pybind____object_____const_pybind____object___const_pybind____object__)
+autotype(pybind11::object&,debug_pybind____object_)
+autotype(pybind11::str (*)(const pybind11::object&),debug_pybind____str_____const_pybind____object__)
+autotype(pybind11::str (*)(pybind11::handle),debug_pybind____str_____pybind____handle_)
+autotype(pybind11::str&,debug_pybind____str_)
+autotype(pybind11::tuple&,debug_pybind____tuple_)
+autotype(std::__cxx11::basic_string<char>,debug_std____cxx____basic_string_char_)
+autotype(std::__cxx11::basic_string<char> (*)(pybind11::handle),debug_std____cxx____basic_string_char______pybind____handle_)
+autotype(void (*)(pybind11::detail::value_and_holder&),debug_void_____pybind____detail__value_and_holder__)
+autotype(void (*)(pybind11::handle),debug_void_____pybind____handle_)

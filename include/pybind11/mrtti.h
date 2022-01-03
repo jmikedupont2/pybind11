@@ -4,13 +4,23 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <cassert>
 
 class mtype_info 
 {
-
+  std::string _name;
 public:
-    const std::string name() const
-  { return "todo";}
+  
+  mtype_info (const char * name):
+    _name(name)
+  {
+    
+  }
+  const std::string name() const
+  {
+    std::cout << "Name : " << _name << std::endl;
+    return _name;
+  }
 } ;
 
 bool operator ==(const mtype_info & a,const  mtype_info & b) {
@@ -55,15 +65,15 @@ namespace std {
 }
 
 
-const mtype_info single_typeinfo;
+//const mtype_info single_typeinfo;
 
-template <class T> static constexpr const mtype_info & mtypeid1(T) {return single_typeinfo; }
-template <class T> static constexpr const mtype_info & mtypeid1() {return single_typeinfo; }
+template <class T> static constexpr const mtype_info & mtypeid2(T&); // {return single_typeinfo; }
+template <class T> static constexpr const mtype_info & mtypeid1(); // {return single_typeinfo; }
 
 //template <class T> 
 
 #define mtypeid(X) mtypeid1<X>()
-#define mtypeidvar(X) mtypeid1(X)
+#define mtypeidvar(X) mtypeid2(X)
 
 //mtype_info * mtype_info[10];
 
