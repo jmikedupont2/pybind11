@@ -43,6 +43,82 @@ std::ostream& operator<<(std::ostream& os, const PyTypeObject& dt)
   
 }
 
+std::ostream& operator<<(std::ostream& os, const std::vector<pybind11::handle>& dt)
+{
+  os << "handle vector";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const pybind11::handle& dt)
+{
+  os << "handle";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const pybind11::detail::function_call& dt)
+{
+  os << "function call";
+    return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const std::vector<pybind11::detail::argument_record>& dt) {
+  os << "ARG REC VEC" << std::endl;
+  return os;
+}
+  
+#define OUT(X) << " " #X " = [" << dt.X << "]"
+
+std::ostream& operator<<(std::ostream& os, const PyMethodDef& dt) {
+  os << "PyMethodDef";
+  return os;
+}
+  
+std::ostream& operator<<(std::ostream& os, const pybind11::detail::function_record& dt)
+{
+  
+  os << "function record { ";
+  os 
+    OUT(name)
+    OUT(signature)
+    OUT(args)
+    OUT(is_constructor)
+    OUT(is_new_style_constructor)
+    OUT( is_stateless)
+    OUT( is_operator)
+    OUT( is_method)
+    OUT( has_args)
+    OUT( has_kwargs)
+    OUT( prepend)
+    OUT(nargs)
+    OUT(nargs_pos)
+    OUT(nargs_pos_only)
+    OUT( scope)
+    OUT( sibling)
+    << " def " << *dt.def 
+     << "}" << std::endl;
+    return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const pybind11::error_already_set& dt)
+{
+  os << "already set";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const __cxxabiv1::__forced_unwind & dt)
+{
+  os << "forced unwind";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const pybind11::reference_cast_error  & dt)
+{
+  os << "pybind11::reference_cast_error";
+  return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const PyObject& dt)
 {
   long vl = (long ) &dt;
@@ -697,7 +773,7 @@ protected:
     /// Main dispatch logic for calls to functions bound using pybind11
     static PyObject *dispatcher(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
       // entry point
-        std::cerr << "pybind11_dispatch:"
+        std::cout << "pybind11_dispatch:"
 		  << " self: " << *self
 		  << " args: " << *args_in
 		  << " kwargs: "<< *kwargs_in << std::endl;
@@ -707,17 +783,24 @@ protected:
         /* Iterator over the list of potentially admissible overloads */
         const function_record *overloads = (function_record *) PyCapsule_GetPointer(self, nullptr),
                               *it = overloads;
-
+	std::cout << "overloads" << overloads << std::endl;
+ 
         /* Need to know how many arguments + keyword arguments there are to pick the right overload */
         const auto n_args_in = (size_t) PyTuple_GET_SIZE(args_in);
 
+	std::cout << "args" << args_in << std::endl;
+	
         handle parent = n_args_in > 0 ? PyTuple_GET_ITEM(args_in, 0) : nullptr,
                result = PYBIND11_TRY_NEXT_OVERLOAD;
-
+	std::cout << "parent" << parent << std::endl;
+ 
         auto self_value_and_holder = value_and_holder();
         if (overloads->is_constructor) {
+	  std::cout << "constructor" << std::endl;
             if (!parent || !PyObject_TypeCheck(parent.ptr(), (PyTypeObject *) overloads->scope.ptr())) {
+	      std::cout << "Not found1" << std::endl;
                 PyErr_SetString(PyExc_TypeError, "__init__(self, ...) called with invalid or missing `self` argument");
+
                 return nullptr;
             }
 
@@ -728,7 +811,10 @@ protected:
             // If this value is already registered it must mean __init__ is invoked multiple times;
             // we really can't support that in C++, so just ignore the second __init__.
             if (self_value_and_holder.instance_registered())
+	      {
+		std::cout << "two inits" << std::endl;
                 return none().release().ptr();
+	      }
         }
 
         try {
@@ -763,16 +849,25 @@ protected:
                  */
 
                 const function_record &func = *it;
+		std::cout << "Consider: " << it->name << " and " << it->signature << std::endl;
+		
+		
                 size_t num_args = func.nargs;    // Number of positional arguments that we need
                 if (func.has_args) --num_args;   // (but don't count py::args
                 if (func.has_kwargs) --num_args; //  or py::kwargs)
                 size_t pos_args = func.nargs_pos;
 
                 if (!func.has_args && n_args_in > pos_args)
+		  {
+		    std::cout << "Too many positional arguments for this overload nargsin" << n_args_in << " pos " << pos_args << std::endl;
                     continue; // Too many positional arguments for this overload
+		  }
 
                 if (n_args_in < pos_args && func.args.size() < pos_args)
+		  {
+		    std::cout << "Not enough positional arguments given, and not enough defaults to fill in the blanks" << std::endl;
                     continue; // Not enough positional arguments given, and not enough defaults to fill in the blanks
+		  }
 
                 function_call call(func, parent);
 
@@ -798,11 +893,13 @@ protected:
                     const argument_record *arg_rec = args_copied < func.args.size() ? &func.args[args_copied] : nullptr;
                     if (kwargs_in && arg_rec && arg_rec->name && dict_getitemstring(kwargs_in, arg_rec->name)) {
                         bad_arg = true;
+			std::cout << "BAD ARG" << arg_rec->name << std::endl;
                         break;
                     }
 
                     handle arg(PyTuple_GET_ITEM(args_in, args_copied));
                     if (arg_rec && !arg_rec->none && arg.is_none()) {
+		      std::cout << "BAD ARG2" << arg_rec->name << std::endl;
                         bad_arg = true;
                         break;
                     }
@@ -810,7 +907,10 @@ protected:
                     call.args_convert.push_back(arg_rec ? arg_rec->convert : true);
                 }
                 if (bad_arg)
+		  {
+		    std::cout << "Maybe it was meant for another overload (issue #688)" << std::endl;
                     continue; // Maybe it was meant for another overload (issue #688)
+		  }
 
                 // Keep track of how many position args we copied out in case we need to come back
                 // to copy the rest into a py::args argument.
@@ -831,7 +931,7 @@ protected:
                         if (value) {
                             call.args.push_back(value);
                             call.args_convert.push_back(arg_rec.convert);
-                        } else
+                        } else			  
                             break;
                     }
 
@@ -885,8 +985,10 @@ protected:
 
                 // 3. Check everything was consumed (unless we have a kwargs arg)
                 if (kwargs && !kwargs.empty() && !func.has_kwargs)
+		  {
+		    std::cout << "Unconsumed kwargs, but no py::kwargs argument to accept them"  << std::endl;
                     continue; // Unconsumed kwargs, but no py::kwargs argument to accept them
-
+		  }
                 // 4a. If we have a py::args argument, create a new tuple with leftovers
                 if (func.has_args) {
                     tuple extra_args;
@@ -922,6 +1024,7 @@ protected:
 
                 // 5. Put everything in a vector.  Not technically step 5, we've been building it
                 // in `call.args` all along.
+		std::cout << "args" << call.args << std::endl;
                 #if !defined(NDEBUG)
                 if (call.args.size() != func.nargs || call.args_convert.size() != func.nargs)
                     pybind11_fail("Internal error: function call dispatcher inserted wrong number of arguments!");
@@ -939,13 +1042,20 @@ protected:
                 // 6. Call the function.
                 try {
                     loader_life_support guard{};
+		    std::cout << "going to call " << func << std::endl;
+		    std::cout << "BEFORE" << std::endl;
+		    
                     result = func.impl(call);
                 } catch (reference_cast_error &) {
+		  std::cout << "next overload cast error" << std::endl;
                     result = PYBIND11_TRY_NEXT_OVERLOAD;
                 }
 
                 if (result.ptr() != PYBIND11_TRY_NEXT_OVERLOAD)
+		  {
+		    std::cout << "break" << std::endl;
                     break;
+		  }
 
                 if (overloaded) {
                     // The (overloaded) call failed; if the call has at least one argument that
@@ -953,6 +1063,7 @@ protected:
                     // then add this call to the list of second pass overloads to try.
                     for (size_t i = func.is_method ? 1 : 0; i < pos_args; i++) {
                         if (second_pass_convert[i]) {
+			  std::cout << "Found one: swap the converting flags back in and store the call for" << i  << std::endl;
                             // Found one: swap the converting flags back in and store the call for
                             // the second pass.
                             call.args_convert.swap(second_pass_convert);
@@ -966,10 +1077,12 @@ protected:
             if (overloaded && !second_pass.empty() && result.ptr() == PYBIND11_TRY_NEXT_OVERLOAD) {
                 // The no-conversion pass finished without success, try again with conversion allowed
                 for (auto &call : second_pass) {
+		  std::cout << "check " << call << std::endl;
                     try {
                         loader_life_support guard{};
                         result = call.func.impl(call);
-                    } catch (reference_cast_error &) {
+                    } catch (reference_cast_error & e) {
+		      std::cout << "reference cast error:" << e << std::endl;
                         result = PYBIND11_TRY_NEXT_OVERLOAD;
                     }
 
@@ -984,12 +1097,15 @@ protected:
             }
         } catch (error_already_set &e) {
             e.restore();
+	    std::cout << "already set" << e << std::endl;
             return nullptr;
 #ifdef __GLIBCXX__
-        } catch ( abi::__forced_unwind& ) {
+        } catch ( abi::__forced_unwind& e) {
+	  std::cout << "forced unwind" << e << std::endl;
             throw;
 #endif
         } catch (...) {
+	  std::cout << "catch ..." << std::endl;
             /* When an exception is caught, give each registered exception
                translator a chance to translate it to a Python exception. First
                all module-local translators will be tried in reverse order of
@@ -1007,18 +1123,22 @@ protected:
 
             auto &local_exception_translators = get_local_internals().registered_exception_translators;
             if (detail::apply_exception_translators(local_exception_translators)) {
+	      std::cout << "apply_exception_translators" << std::endl;
                 return nullptr;
             }
             auto &exception_translators = get_internals().registered_exception_translators;
             if (detail::apply_exception_translators(exception_translators)) {
+	      std::cout << "apply_exception_translators2" << std::endl;
                 return nullptr;
             }
 
             PyErr_SetString(PyExc_SystemError, "Exception escaped from default exception translator!");
+	    std::cout << "apply_exception_translators3" << std::endl;
             return nullptr;
         }
 
         auto append_note_if_missing_header_is_suspected = [](std::string &msg) {
+	  std::cout <<"check msg: " << msg << std::endl;
             if (msg.find("std::") != std::string::npos) {
                 msg += "\n\n"
                        "Did you forget to `#include <pybind11/stl.h>`? Or <pybind11/complex.h>,\n"
@@ -1029,10 +1149,14 @@ protected:
         };
 
         if (result.ptr() == PYBIND11_TRY_NEXT_OVERLOAD) {
+	  std::cout << "no results "  << std::endl;
             if (overloads->is_operator)
+	      {
+		std::cout << "is operator" << std::endl;
                 return handle(Py_NotImplemented).inc_ref().ptr();
+	      }
 
-            std::string msg = std::string(overloads->name) + "(): incompatible " +
+            std::string msg = std::string(overloads->name) + "(): MYTEST incompatible " +
                 std::string(overloads->is_constructor ? "constructor" : "function") +
                 " arguments. The following argument types are supported:\n";
 
@@ -1071,7 +1195,8 @@ protected:
                 else msg += ", ";
                 try {
                     msg += pybind11::repr(args_[ti]);
-                } catch (const error_already_set&) {
+                } catch (const error_already_set& e) {
+		  std::cout << "already set" << e << std::endl;
                     msg += "<repr raised Error>";
                 }
             }
@@ -1087,7 +1212,8 @@ protected:
                         msg += pybind11::str("{}=").format(kwarg.first);
                         try {
                             msg += pybind11::repr(kwarg.second);
-                        } catch (const error_already_set&) {
+                        } catch (const error_already_set& e) {
+			  std::cout << "already set" << e << std::endl;
                             msg += "<repr raised Error>";
                         }
                     }
@@ -1095,7 +1221,9 @@ protected:
             }
 
             append_note_if_missing_header_is_suspected(msg);
+	    std::cout << "Type error internal: " <<  msg.c_str() << std::endl;
             PyErr_SetString(PyExc_TypeError, msg.c_str());
+	    
             return nullptr;
         }
         if (!result) {
@@ -1103,13 +1231,19 @@ protected:
                               "Python type! The signature was\n\t";
             msg += it->signature;
             append_note_if_missing_header_is_suspected(msg);
+	    std::cout << "error3" <<  msg.c_str() << std::endl;
             PyErr_SetString(PyExc_TypeError, msg.c_str());
+
+
+	    
             return nullptr;
         }
         if (overloads->is_constructor && !self_value_and_holder.holder_constructed()) {
             auto *pi = reinterpret_cast<instance *>(parent.ptr());
             self_value_and_holder.type->init_instance(pi, nullptr);
+	    
         }
+	std::cout << "final dispatch" <<   result.ptr() << "sig" << it->signature << std::endl;
         return result.ptr();
     }
 };
@@ -1487,9 +1621,9 @@ public:
         generic_type::initialize(record);
 
         if (has_alias) {
-            auto &instances = record.module_local ? get_local_internals().registered_types_cpp : get_internals().registered_types_cpp;
-            // instances[std::type_index(mtypeid(type_alias))] = instances[std::type_index(mtypeid(type))];
-	    assert(0);
+	  //auto &instances = record.module_local ? get_local_internals().registered_types_cpp : get_internals().registered_types_cpp;
+	  //instances[std::type_index(mtypeid(type_alias))] = instances[std::type_index(mtypeid(type))];
+	  assert(0);
         }
     }
 

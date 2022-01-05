@@ -19,7 +19,8 @@ public:
   const std::string name() const
   {
     std::cout << "Name : " << _name << std::endl;
-    return _name;
+    //return "python_example." + _name;
+    return  _name;
   }
 } ;
 
